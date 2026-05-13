@@ -1,0 +1,16 @@
+-- ────────────────────────────────────────────────────────────────────
+-- 10-extensions.sql  (example)
+--
+-- Rename to `10-extensions.sql` to activate. Runs once on first boot.
+-- All commands are idempotent — safe to re-run if you wipe the volume.
+--
+-- These extensions are commonly useful with Odoo:
+--   - unaccent : accent-insensitive search (Odoo expects it)
+--   - pg_trgm  : trigram indexes for fuzzy / LIKE search
+--   - btree_gin / btree_gist : composite indexes spanning text + ids
+-- ────────────────────────────────────────────────────────────────────
+
+CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- CREATE EXTENSION IF NOT EXISTS btree_gin;
+-- CREATE EXTENSION IF NOT EXISTS btree_gist;

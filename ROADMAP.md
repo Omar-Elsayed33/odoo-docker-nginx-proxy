@@ -8,43 +8,61 @@ The project's north star: a Compose file you can read in five minutes and run in
 
 ---
 
-## v0.1 — Minimum viable stack ✅ in progress
+## v0.1 — Base standalone stack ✅ completed
 
-Goal: a working, opinionated Odoo deployment that boots cleanly from `.env.example`.
+Goal: a runnable Odoo + PostgreSQL Compose stack that boots cleanly from `.env.example`.
 
-- [ ] `docker-compose.yml` with Nginx, Odoo, PgBouncer, PostgreSQL services
-- [ ] `config/odoo.conf` parameterised via environment
-- [ ] `config/nginx/` with TLS, gzip, websocket upgrade, sane proxy timeouts
-- [ ] `pgbouncer/pgbouncer.ini` in transaction-pooling mode
-- [ ] Named volumes for PG data and Odoo filestore
-- [ ] Healthchecks on every service
-- [ ] `scripts/backup.sh` (pg_dump + filestore tarball)
-- [ ] `scripts/restore.sh`
+- [x] `docker-compose.yml` with Odoo + PostgreSQL services
+- [x] `odoo/config/odoo.conf` parameterised via environment
+- [x] Named, persistent volumes for the PG cluster and the Odoo filestore
+- [x] Healthchecks on every service (`pg_isready`, `/web/health`)
+- [x] Restart policies (`unless-stopped`) and log rotation (`json-file`)
+- [x] Private bridge network; database not exposed to the host
+- [x] `postgres/init/` for first-boot SQL/sh scripts (with an example)
+
+## v0.2 — Nginx reverse proxy (upcoming)
+
+Goal: a public, TLS-terminated entry point in front of Odoo.
+
+- [ ] `config/nginx/nginx.conf` and a per-vhost `odoo.conf`
+- [ ] TLS termination with strong cipher defaults
+- [ ] Websocket upgrade for Odoo longpolling (`gevent_port`)
+- [ ] Sane proxy timeouts, gzip, and `client_max_body_size` for uploads
+- [ ] Flip `proxy_mode = True` in `odoo.conf` once trusted-proxy is in place
 - [ ] Self-signed cert bootstrap for local development
 
-## v0.2 — Hardening
+## v0.3 — PgBouncer integration (upcoming)
+
+Goal: insulate PostgreSQL from Odoo's worker fan-out.
+
+- [ ] `pgbouncer/pgbouncer.ini` in transaction-pooling mode
+- [ ] `pgbouncer/userlist.txt` generation (SCRAM-SHA-256), kept out of git
+- [ ] Point Odoo at PgBouncer (port 6432) via `.env`
+- [ ] Documented pool sizing (`default_pool_size`, `reserve_pool_*`)
+
+## v0.4 — Hardening
 
 Goal: ship-it-to-a-VPS quality.
 
 - [ ] Drop unnecessary capabilities (`cap_drop: [ALL]`) per service
 - [ ] Read-only root filesystems where feasible
 - [ ] Non-root users in every container
-- [ ] Docker log rotation (`json-file` with size limits)
 - [ ] Rate limiting on `/web/login` and `/web/database/*`
 - [ ] Optional fail2ban sidecar / Nginx-level IP banning
 - [ ] CIS-Docker benchmark gap analysis in `docs/security.md`
 
-## v0.3 — Operations
+## v0.5 — Operations, backups & observability
 
 Goal: you can actually run this without panic.
 
+- [ ] `scripts/backup.sh` (pg_dump + filestore tarball)
+- [ ] `scripts/restore.sh` with a documented restore drill
 - [ ] Let's Encrypt sidecar (`acme.sh` or `certbot`) with auto-renewal
 - [ ] Prometheus exporters (postgres_exporter, nginx-prometheus-exporter)
 - [ ] Sample Grafana dashboards in `docs/observability/`
 - [ ] Cron-driven off-host backup example (restic → S3-compatible target)
-- [ ] Documented restore drill (the only backup that works is one you've restored)
 
-## v0.4 — CI & quality
+## v0.6 — CI & quality
 
 - [ ] GitHub Actions: `docker compose config` validation
 - [ ] `hadolint` for any Dockerfiles we ship
