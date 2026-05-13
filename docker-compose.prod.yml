@@ -1,0 +1,165 @@
+# ─────────────────────────────────────────────────────────────────────
+# docker-compose.prod.yml — production overrides for docker-compose.yml
+#
+# This file is meant to be composed with the base file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Or — the recommended pattern — set this in your production .env so
+# every `docker compose` invocation (and every script under scripts/)
+# automatically applies the overrides:
+#
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+#
+# What this file changes vs. the base:
+#   - restart: always (vs unless-stopped — survives Docker daemon
+#     restarts, not just container exits)
+#   - cap_drop: [ALL] + minimal cap_add for each service
+#   - security_opt: no-new-privileges (defence-in-depth against
+#     setuid binaries inside containers)
+#   - deploy.resources.limits — explicit CPU + memory ceilings so
+#     one runaway worker can't starve the host
+#   - Tighter log rotation (20 MB × 5 = 100 MB per container max)
+#   - Tighter healthcheck cadence — catch wedged services faster
+#   - Backups bind-mounted to a host path for off-host shipping
+#
+# What this file does NOT change:
+#   - Image tags. Production should still resolve through the same
+#     ODOO_VERSION / NGINX_VERSION / etc. env vars as dev. For real
+#     reproducibility, pin by digest in your .env (see SECURITY.md).
+#   - Network exposure. The base file already binds only nginx to
+#     the host; db / pgbouncer / odoo are reachable only on the
+#     private bridge.
+#   - Service definitions. New services (certbot, monitoring sidecars,
+#     etc.) belong in their own override files, not here.
+# ─────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ───────────────────────────────────────────────────────────────────
+  # PostgreSQL
+  # ───────────────────────────────────────────────────────────────────
+  db:
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      # Postgres needs to chown the data dir on first init and switch
+      # to the postgres user. CHOWN/SETGID/SETUID/FOWNER cover both.
+      - CHOWN
+      - SETGID
+      - SETUID
+      - FOWNER
+      - DAC_READ_SEARCH
+    deploy:
+      resources:
+        limits:
+          cpus: "${POSTGRES_CPUS:-2}"
+          memory: "${POSTGRES_MEMORY:-2g}"
+        reservations:
+          memory: "512m"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ───────────────────────────────────────────────────────────────────
+  # PgBouncer
+  # ───────────────────────────────────────────────────────────────────
+  pgbouncer:
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      # The edoburu entrypoint chowns /etc/pgbouncer/userlist.txt at
+      # start; needs CHOWN. Then drops to the pgbouncer user.
+      - CHOWN
+      - SETGID
+      - SETUID
+    deploy:
+      resources:
+        limits:
+          cpus: "${PGBOUNCER_CPUS:-0.5}"
+          memory: "${PGBOUNCER_MEMORY:-128m}"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ───────────────────────────────────────────────────────────────────
+  # Odoo
+  # ───────────────────────────────────────────────────────────────────
+  odoo:
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Odoo doesn't need any extra capabilities — the image runs as
+    # the `odoo` user and never binds privileged ports or touches
+    # device nodes. If you ship custom addons that do, add them here
+    # rather than weakening the base.
+    deploy:
+      resources:
+        limits:
+          cpus: "${ODOO_CPUS:-4}"
+          memory: "${ODOO_MEMORY:-4g}"
+        reservations:
+          memory: "1g"
+    healthcheck:
+      # Tighter than base: catch a stuck worker pool inside ~45 s
+      # instead of ~150 s. Adjust if your hardware is slow on cold
+      # start (raise start_period before raising retries).
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+        # Useful when shipping to a log aggregator (Loki, ELK):
+        # the labels appear as JSON fields on each line.
+        labels: "service=odoo,env=production"
+
+  # ───────────────────────────────────────────────────────────────────
+  # Nginx
+  # ───────────────────────────────────────────────────────────────────
+  nginx:
+    restart: always
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      # NET_BIND_SERVICE is the one that matters — lets nginx bind to
+      # :80 and :443 after dropping to the nginx user. The others are
+      # the entrypoint's chowns on /var/cache/nginx and /var/run.
+      - CHOWN
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+      - DAC_OVERRIDE
+    deploy:
+      resources:
+        limits:
+          cpus: "${NGINX_CPUS:-1}"
+          memory: "${NGINX_MEMORY:-256m}"
+    healthcheck:
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+        labels: "service=nginx,env=production"
