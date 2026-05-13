@@ -34,14 +34,15 @@ Goal: a public, TLS-terminated entry point in front of Odoo.
 - [x] Self-signed cert bootstrap documented in `nginx/certs/README.md`
 - [x] Rate-limit zones declared (enforcement deferred to v0.4)
 
-## v0.3 — PgBouncer integration (upcoming)
+## v0.3 — PgBouncer integration ✅ completed
 
 Goal: insulate PostgreSQL from Odoo's worker fan-out.
 
-- [ ] `pgbouncer/pgbouncer.ini` in transaction-pooling mode
-- [ ] `pgbouncer/userlist.txt` generation (SCRAM-SHA-256), kept out of git
-- [ ] Point Odoo at PgBouncer (port 6432) via `.env`
-- [ ] Documented pool sizing (`default_pool_size`, `reserve_pool_*`)
+- [x] `pgbouncer/pgbouncer.ini` in transaction-pooling mode
+- [x] SCRAM-SHA-256 auth end-to-end; `userlist.txt` gitignored, generated from `.env`
+- [x] `pgbouncer/generate-userlist.sh` idempotent helper
+- [x] Odoo routed through PgBouncer; `ODOO_DB_HOST` / `ODOO_DB_PORT` bypass switch
+- [x] `docs/pgbouncer.md` covering rationale, sizing, LISTEN/NOTIFY trade-offs, runbook
 
 ## v0.4 — Hardening
 
