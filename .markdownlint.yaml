@@ -1,0 +1,47 @@
+# ─────────────────────────────────────────────────────────────────────
+# markdownlint configuration
+#
+# Enable everything by default, then relax the rules that conflict
+# with this project's documentation choices. Each override has a
+# one-line rationale so future maintainers know whether to keep it.
+#
+# Full rule reference:
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+# ─────────────────────────────────────────────────────────────────────
+
+default: true
+
+# MD013 — line length.
+# Prose is semantically wrapped; tables and code blocks intentionally
+# carry long lines. 200 covers our prose ceiling without flagging
+# meaningful content.
+MD013:
+  line_length: 200
+  tables: false
+  code_blocks: false
+  headings: false
+
+# MD024 — multiple headings with the same content.
+# Every doc has a "## Contents" TOC. They're not siblings inside one
+# file, so `siblings_only` is the right relaxation.
+MD024:
+  siblings_only: true
+
+# MD033 — inline HTML.
+# Not currently used, but reserved for the few cases (badges, image
+# attributes) where markdown can't express what we need.
+MD033: false
+
+# MD036 — emphasis used instead of a header.
+# We use **bold** inside prose paragraphs for emphasis, not for
+# pseudo-headings. The rule's heuristic flags both.
+MD036: false
+
+# MD040 — fenced code blocks should have a language.
+# Architecture diagrams in `README.md` and `docs/architecture.md` use
+# fenced blocks for ASCII art with no syntactic language to declare.
+MD040: false
+
+# MD041 — first line of file should be a top-level heading.
+# We always start with `# Title`. Keep this enabled — catches files
+# that lost their H1 in a rebase.

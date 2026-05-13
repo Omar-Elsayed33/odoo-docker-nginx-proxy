@@ -1,0 +1,59 @@
+# ─────────────────────────────────────────────────────────────────────
+# validate — fast functional checks on every PR and on push to main
+#
+# Two independent jobs, run in parallel:
+#   - compose:    parses both compose chains (base, base+prod)
+#   - shellcheck: lints every shell script in the repo
+#
+# Both are designed to run in well under a minute and need no secrets,
+# no Docker image pulls, and no external services. Failure means the
+# repo is in a state that would break a clean clone.
+# ─────────────────────────────────────────────────────────────────────
+
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    name: docker compose config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate base compose
+        run: docker compose -f docker-compose.yml config --quiet
+
+      - name: Validate base + prod compose
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.prod.yml \
+            config --quiet
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        env:
+          # Don't fail on `source` resolution warnings (SC1091) — our
+          # scripts source scripts/lib/common.sh, which shellcheck
+          # can't always follow from the action's working tree.
+          SHELLCHECK_OPTS: --exclude=SC1091
+        with:
+          scandir: ./scripts
+          additional_files: pgbouncer/generate-userlist.sh
+          severity: error

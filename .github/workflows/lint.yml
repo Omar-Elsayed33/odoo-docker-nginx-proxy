@@ -1,0 +1,33 @@
+# ─────────────────────────────────────────────────────────────────────
+# lint — markdown style checks
+#
+# Runs markdownlint-cli2 over every .md file in the repo using the
+# rules defined in .markdownlint.yaml. Configured to allow the
+# documentation choices this project actually makes (long table cells,
+# plaintext code blocks for diagrams, repeated "## Contents" headings
+# across files).
+# ─────────────────────────────────────────────────────────────────────
+
+name: lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  markdown:
+    name: markdownlint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run markdownlint-cli2
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          globs: '**/*.md'

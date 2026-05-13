@@ -83,11 +83,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/production-deployment.md` — tightened: added Contents TOC, references `architecture.md` for the "why" and `backup-and-restore.md` instead of duplicating the backup section.
 - `CONTRIBUTING.md` rewritten with: Contents TOC, first-time-contributor walkthrough, expanded development workflow, Conventional Commits type table with examples, code-style sub-sections per language (shell / YAML / nginx / markdown), expanded PR checklist.
 
+### Added (CI & quality — v0.6)
+- `.github/workflows/validate.yml` — two parallel jobs on every PR and on push to `main`: validates `docker compose config` for both the base chain and `base + prod`, and runs `shellcheck` (severity: error, `SC1091` excluded for `source`-resolution noise) across `scripts/` and `pgbouncer/generate-userlist.sh`.
+- `.github/workflows/lint.yml` — markdownlint-cli2 across all `**/*.md`, configured via `.markdownlint.yaml`.
+- `.markdownlint.yaml` — project-specific rule relaxations with one-line rationale per override: `MD013` (line length 200, off in tables / code blocks / headings), `MD024` (siblings-only so per-doc TOCs don't collide), `MD033`/`MD036`/`MD040` off (inline HTML reserved, bold-as-emphasis-in-prose, plaintext diagram blocks).
+- `.github/pull_request_template.md` — Summary / Type / What changed / What's out of scope / Test plan checklist (CI verifies the first two boxes automatically) / Notes for reviewers.
+- `.github/ISSUE_TEMPLATE/bug_report.yml` — form-based, requires git ref, platform, what-happened, expected, logs (rendered as shell), `docker compose ps`, with pre-submit checkboxes confirming secrets were redacted and troubleshooting.md was checked.
+- `.github/ISSUE_TEMPLATE/feature_request.yml` — form-based, requires problem / proposal, with a ROADMAP "out of scope" scope-check checkbox to head off out-of-scope proposals at submission time.
+- `.github/ISSUE_TEMPLATE/config.yml` — disables blank issues; routes security reports to `SECURITY.md` and conversations to GitHub Discussions.
+
 ### Planned
 - Rate-limit enforcement on `/web/login` and `/web/database/*` (v0.4).
 - Let's Encrypt certbot sidecar with auto-renewal (v0.5).
 - Read-only root filesystems + image-pin-by-digest (v0.4).
-- CI pipeline (lint, compose config validation, hadolint, shellcheck on scripts/).
+- `hadolint` once we ship a Dockerfile of our own.
+- Trivy / Grype image-vulnerability scan on a schedule (v0.6).
 
 ---
 

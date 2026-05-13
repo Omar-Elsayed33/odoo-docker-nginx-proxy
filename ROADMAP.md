@@ -71,10 +71,11 @@ Goal: you can actually run this without panic.
 
 ## v0.6 — CI & quality
 
-- [ ] GitHub Actions: `docker compose config` validation
-- [ ] `hadolint` for any Dockerfiles we ship
-- [ ] `shellcheck` for all `scripts/*.sh`
-- [ ] `markdownlint` for docs
+- [x] GitHub Actions: `docker compose config` validation (base + base+prod chains)
+- [x] `shellcheck` for all `scripts/*.sh` + `pgbouncer/generate-userlist.sh`
+- [x] `markdownlint` for docs (with project-specific config)
+- [x] Pull request template + structured issue templates (bug + feature)
+- [ ] `hadolint` — deferred until we ship a Dockerfile of our own
 - [ ] Trivy / Grype image scan on a schedule
 
 ## v1.0 — Stable
