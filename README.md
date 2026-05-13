@@ -109,8 +109,11 @@ docker compose logs -f odoo
 │   ├── pgbouncer.ini           # Pool config (transaction mode, sizing, timeouts)
 │   ├── userlist.txt.example    # userlist.txt format reference (real file gitignored)
 │   └── generate-userlist.sh    # Generates userlist.txt from .env credentials
+├── docker-compose.prod.yml     # Production overrides (caps, limits, log rot, restart)
+├── .env.prod.example           # Production env template (real domain, stronger sizing)
 ├── docs/
-│   └── pgbouncer.md            # Why PgBouncer + tuning + LISTEN/NOTIFY tradeoff
+│   ├── pgbouncer.md            # Why PgBouncer + tuning + LISTEN/NOTIFY tradeoff
+│   └── production-deployment.md  # Server prep, SSL, backups, monitoring, scaling, runbook
 └── scripts/
     ├── install.sh              # First-time setup: .env, certs, secrets, userlist
     ├── start.sh                # Bring stack up; wait until healthy
@@ -208,6 +211,9 @@ Backups land in `./backups/` and are gitignored. Ship them off-host (S3, B2, res
 
 ## Documentation
 
+- [docs/production-deployment.md](docs/production-deployment.md) — taking the stack live on a Linux server
+- [docs/pgbouncer.md](docs/pgbouncer.md) — why PgBouncer matters, sizing, LISTEN/NOTIFY trade-offs
+- [nginx/README.md](nginx/README.md) — reverse-proxy architecture, customisation, runbook
 - [CHANGELOG.md](CHANGELOG.md) — release history
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development workflow, code style, PR process
 - [ROADMAP.md](ROADMAP.md) — what's planned and what's out of scope

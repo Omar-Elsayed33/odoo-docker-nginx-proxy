@@ -65,9 +65,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README: `Quick start` now points at `./scripts/install.sh` + `./scripts/start.sh` instead of raw `docker compose` commands. New "Operational scripts" section with the full table and one-liner cron examples.
 - Repo layout in README updated to list the eight new files under `scripts/`.
 
+### Added (production deployment surface)
+- `docker-compose.prod.yml` — overrides applied on top of the base file: `restart: always`, `cap_drop: [ALL]` with minimal per-service `cap_add`, `security_opt: no-new-privileges`, env-driven `deploy.resources.limits` (CPU + memory) per service, tighter healthcheck cadence on odoo + nginx, log-rotation tightened to 20 MB × 5 with `service=…,env=production` labels for aggregator pickup.
+- `.env.prod.example` — production env template with `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml` so plain `docker compose` and every `scripts/` wrapper transparently apply the prod overrides. Production-oriented defaults: separate `POSTGRES_VOLUME` (`odoo-prod-pgdata`), real domain placeholder, `WORKERS=9`, resource caps per service.
+- `docs/production-deployment.md` — server requirements table, pre-deployment checklist (server prep / repo / TLS / verify), step-by-step deploy, environment-separation table (dev ↔ prod), SSL strategy (Let's Encrypt webroot + commercial CA), backup strategy with 3-2-1 rule and restic example, monitoring tiers (MVP → Prometheus/Grafana → log shipping), scaling sequence (vertical → horizontal Odoo → horizontal Postgres last), security recommendations, operational runbook table, common production issues table, cut-over checklist.
+
+### Changed
+- README repo layout adds `docker-compose.prod.yml`, `.env.prod.example`, `docs/production-deployment.md`.
+- README Documentation section now lists per-component docs (production, pgbouncer, nginx).
+
 ### Planned
 - Rate-limit enforcement on `/web/login` and `/web/database/*` (v0.4).
 - Let's Encrypt certbot sidecar with auto-renewal (v0.5).
+- Read-only root filesystems + image-pin-by-digest (v0.4).
 - CI pipeline (lint, compose config validation, hadolint, shellcheck on scripts/).
 
 ---

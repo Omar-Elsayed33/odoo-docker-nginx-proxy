@@ -62,11 +62,12 @@ Goal: you can actually run this without panic.
 - [x] `scripts/install.sh`, `start.sh`, `stop.sh`, `update.sh`, `logs.sh`
 - [x] `scripts/backup.sh` (pg_dump + filestore tarball, sha256-checksummed)
 - [x] `scripts/restore.sh` with safety prompts and checksum verification
-- [ ] Documented quarterly restore drill in `docs/`
+- [x] `docker-compose.prod.yml` + `.env.prod.example` + `docs/production-deployment.md`
+- [x] Cron-driven off-host backup example (restic → S3-compatible target, in production docs)
+- [x] Restore-drill cadence documented (monthly → quarterly)
 - [ ] Let's Encrypt sidecar (`acme.sh` or `certbot`) with auto-renewal
 - [ ] Prometheus exporters (postgres_exporter, nginx-prometheus-exporter)
 - [ ] Sample Grafana dashboards in `docs/observability/`
-- [ ] Cron-driven off-host backup example (restic → S3-compatible target)
 
 ## v0.6 — CI & quality
 
