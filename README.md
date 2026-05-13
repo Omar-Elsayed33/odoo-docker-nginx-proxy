@@ -107,9 +107,13 @@ docker compose logs -f odoo
 │   │   └── odoo.conf           # Vhost: upstreams, TLS, websocket, static cache
 │   ├── templates/              # Reusable snippets (TLS, security, gzip, proxy)
 │   └── certs/                  # TLS material (gitignored except README.md)
-├── pgbouncer/                  # (future) Pool config + userlist
-├── scripts/                    # (future) backup.sh, restore.sh
-└── docs/                       # (future) ADRs, runbooks
+├── pgbouncer/
+│   ├── pgbouncer.ini           # Pool config (transaction mode, sizing, timeouts)
+│   ├── userlist.txt.example    # userlist.txt format reference (real file gitignored)
+│   └── generate-userlist.sh    # Generates userlist.txt from .env credentials
+├── docs/
+│   └── pgbouncer.md            # Why PgBouncer + tuning + LISTEN/NOTIFY tradeoff
+└── scripts/                    # (future) backup.sh, restore.sh
 ```
 
 ## Configuration

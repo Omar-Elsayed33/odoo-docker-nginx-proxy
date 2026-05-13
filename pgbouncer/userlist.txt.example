@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────────────────────────────
+# pgbouncer/userlist.txt — copy this file to userlist.txt and edit.
+#
+# This file is consumed by PgBouncer at startup (path is set via
+# `auth_file` in pgbouncer.ini). Each line is:
+#
+#     "username" "password-or-hash"
+#
+# Format rules:
+#   - Both fields MUST be double-quoted, even if they contain no spaces.
+#   - One user per line. No trailing whitespace.
+#   - Lines beginning with `#` or `;` are NOT supported by PgBouncer's
+#     parser — keep comments in *this* file only and delete them from
+#     your real userlist.txt.
+#
+# Authentication modes:
+#   - auth_type = scram-sha-256 (our default): PgBouncer accepts both
+#     pre-hashed SCRAM secrets AND plaintext passwords. With plaintext,
+#     PgBouncer hashes in memory at startup — convenient and still
+#     SCRAM on the wire to clients.
+#   - auth_type = md5: PgBouncer needs `md5<hex>` where <hex> is
+#     md5(password + username). Cheap to compute but weaker.
+#   - auth_type = plain: PgBouncer sends plaintext on the wire. Avoid.
+#
+# Security:
+#   - Real userlist.txt is gitignored (see .gitignore).
+#   - File should be `chmod 600`. The included generate script does this.
+#   - Plaintext on disk is the same risk surface as POSTGRES_PASSWORD in
+#     .env — both are root-readable. For stricter environments,
+#     pre-hash and commit only SCRAM secrets.
+# ─────────────────────────────────────────────────────────────────────
+
+# Example: plaintext password (most common — PgBouncer hashes it itself
+# under scram-sha-256). Replace with your real POSTGRES_USER and
+# POSTGRES_PASSWORD from .env, then save as `userlist.txt` (no .example).
+"odoo" "replace-with-your-POSTGRES_PASSWORD"
+
+# Example: pre-computed SCRAM secret. Use this form if you don't want
+# plaintext on disk. Generate with:
+#
+#     docker compose exec -T db psql -U "$POSTGRES_USER" -At -c \
+#       "SELECT '\"'||usename||'\" \"'||passwd||'\"' \
+#        FROM pg_shadow WHERE usename = current_user;"
+#
+# Output looks like:
+#"odoo" "SCRAM-SHA-256$4096:abcd...==$EFGH...:IJKL...=="
+
+# Example: dedicated admin user for the PgBouncer console (uncomment
+# `admin_users` in pgbouncer.ini to enable). Use a separate password.
+#"pgbouncer_admin" "another-strong-password"

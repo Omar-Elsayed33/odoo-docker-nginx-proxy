@@ -2,12 +2,10 @@
 # odoo-docker-nginx-proxy — base standalone stack
 #
 # Services in this file:
-#   - db    : PostgreSQL (the only database supported by Odoo)
-#   - odoo  : Odoo application server
-#   - nginx : Reverse proxy / TLS termination / public entry point
-#
-# Not in this file (yet, by design):
-#   - PgBouncer connection pooling — added in a follow-up PR (v0.3)
+#   - db        : PostgreSQL (the only database supported by Odoo)
+#   - pgbouncer : Connection pool in front of PostgreSQL (transaction mode)
+#   - odoo      : Odoo application server (routes through pgbouncer)
+#   - nginx     : Reverse proxy / TLS termination / public entry point
 #
 # Bring it up with:
 #   cp .env.example .env && $EDITOR .env
@@ -69,6 +67,55 @@ services:
     logging: *default-logging
 
   # ───────────────────────────────────────────────────────────────────
+  # PgBouncer — connection pool in front of PostgreSQL
+  # ───────────────────────────────────────────────────────────────────
+  # Transaction-mode pool. Odoo opens many short-lived connections;
+  # PgBouncer fans them onto a small number of warm Postgres backends,
+  # cutting backend-startup latency and freeing Postgres memory.
+  #
+  # Auth is SCRAM-SHA-256 end-to-end. pgbouncer.ini reads its userlist
+  # from /etc/pgbouncer/userlist.txt, which is generated from .env by
+  # `./pgbouncer/generate-userlist.sh` (run once before `up`).
+  #
+  # See docs/pgbouncer.md for the rationale, sizing guide, and the
+  # LISTEN/NOTIFY trade-off under transaction mode.
+  pgbouncer:
+    image: edoburu/pgbouncer:${PGBOUNCER_VERSION:-v1.25.1-p0}
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo}-pgbouncer
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Writable bind mount: the edoburu/pgbouncer entrypoint runs
+      # `touch` and `chmod` on /etc/pgbouncer/userlist.txt at startup
+      # to enforce permissions, and loops indefinitely against a
+      # read-only mount. The container is already trusted with DB
+      # credentials, so RW access to its own config dir is fine.
+      #
+      # userlist.txt MUST exist before `docker compose up` — generate
+      # it with `./pgbouncer/generate-userlist.sh`. If it's missing,
+      # Docker will silently create a directory at the bind-mount
+      # target and PgBouncer will fail to parse "userlist.txt" as a
+      # file. The generate script is the only sanctioned path.
+      - ./pgbouncer:/etc/pgbouncer
+    expose:
+      - "6432"
+    environment:
+      TZ: ${TZ:-UTC}
+    networks:
+      - odoo-net
+    healthcheck:
+      # PgBouncer answers psql connections on 6432. pg_isready is in
+      # the edoburu/pgbouncer image and exits 0 when the pool is up.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-p", "6432", "-U", "${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    logging: *default-logging
+
+  # ───────────────────────────────────────────────────────────────────
   # Odoo
   # ───────────────────────────────────────────────────────────────────
   # The image is resolved from ODOO_IMAGE (preferred) or built from
@@ -88,11 +135,18 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
     environment:
       # Consumed by the official Odoo image entrypoint to build the
       # database connection. Anything else goes through odoo.conf.
-      HOST: db
-      PORT: 5432
+      #
+      # Defaults route through PgBouncer (transaction-mode pool). Set
+      # ODOO_DB_HOST=db and ODOO_DB_PORT=5432 in .env to bypass the
+      # pool for debugging or for workloads that need session-level
+      # Postgres features (see docs/pgbouncer.md → "LISTEN/NOTIFY").
+      HOST: ${ODOO_DB_HOST:-pgbouncer}
+      PORT: ${ODOO_DB_PORT:-6432}
       USER: ${POSTGRES_USER}
       PASSWORD: ${POSTGRES_PASSWORD}
       TZ: ${TZ:-UTC}

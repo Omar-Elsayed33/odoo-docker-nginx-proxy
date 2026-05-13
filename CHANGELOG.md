@@ -40,8 +40,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `odoo/config/odoo.conf`: flipped `proxy_mode = True` to trust nginx's forwarded headers. Comment hardened to flag the spoofing risk if the nginx layer is ever removed without flipping this back.
 - `.env.example`: added `NGINX_VERSION`, `NGINX_HTTP_PORT`, `NGINX_HTTPS_PORT` so port collisions on 80/443 are configurable without editing YAML.
 
+### Added (PgBouncer connection pooling — v0.3)
+- `pgbouncer` service in `docker-compose.yml`: `edoburu/pgbouncer:${PGBOUNCER_VERSION:-v1.25.1-p0}` (image uses a `v<version>-pN` tag convention, *not* raw upstream PgBouncer numbers), healthchecked via `pg_isready`, depends on a healthy `db`, not published to the host.
+- `pgbouncer/pgbouncer.ini` — transaction-mode pool, SCRAM-SHA-256 auth, wildcard `[databases]` route so newly-created Odoo databases work without re-config. Pool sizing (`default_pool_size=25`, `reserve_pool_size=5`, `max_db_connections=100`, `max_client_conn=200`) and timeouts tuned for a single Odoo instance with 3–4 HTTP workers.
+- `pgbouncer/userlist.txt.example` — annotated template documenting the three auth modes and the security trade-offs of plaintext-vs-SCRAM on disk.
+- `pgbouncer/generate-userlist.sh` — idempotent helper that reads `POSTGRES_USER` / `POSTGRES_PASSWORD` from `.env`, writes a `chmod 600` userlist.txt, refuses to run against placeholder passwords.
+- `docs/pgbouncer.md` — first entry in the docs/ tree: why pooling matters for Odoo (process-per-connection cost, worker fan-out, connection churn, `max_connections` ceiling), how the layer is wired, first-time setup, tuning table with rule-of-thumb sizing, pool-mode trade-offs, the LISTEN/NOTIFY caveat and how to bypass the pool for the longpolling worker, runbook (SHOW POOLS / SHOW STATS / SIGHUP reload / PAUSE-RESUME maintenance window), and a troubleshooting table.
+
+### Changed (PgBouncer connection pooling — v0.3)
+- `odoo` service now `depends_on: pgbouncer (service_healthy)` and routes through it via `HOST=${ODOO_DB_HOST:-pgbouncer}` / `PORT=${ODOO_DB_PORT:-6432}`. `.env` can flip those back to `db` / `5432` to bypass the pool.
+- `.env.example`: dropped the unused `PGBOUNCER_POOL_MODE` / `_MAX_CLIENT_CONN` / `_DEFAULT_POOL_SIZE` / `_RESERVE_POOL_*` knobs (PgBouncer does not envsubst its config). Added `PGBOUNCER_VERSION`, `ODOO_DB_HOST`, `ODOO_DB_PORT`. Comment explains tuning is via `pgbouncer.ini`.
+
 ### Planned
-- PgBouncer in transaction-pool mode between Odoo and PostgreSQL.
 - Rate-limit enforcement on `/web/login` and `/web/database/*` (v0.4).
 - `scripts/backup.sh` and `scripts/restore.sh`.
 - Let's Encrypt certbot sidecar with auto-renewal (v0.5).
