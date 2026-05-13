@@ -65,8 +65,8 @@ Compose v2.20+ for standalone (non-swarm) deployments.
 
 - **RAM** dominates Odoo sizing. Each worker is ~250–700 MB at steady
   state. Postgres reserves ~256 MB for shared buffers plus per-connection
-  cost. PgBouncer is negligible (~50 MB). 8 GB covers 4 workers + Postgres
-  + nginx + headroom.
+  cost. PgBouncer is negligible (~50 MB). 8 GB covers four workers,
+  Postgres, nginx, and headroom.
 - **CPU** dominates Odoo response latency. Workers are single-threaded
   CPython; more cores = more parallel requests.
 - **Disk type** matters more than disk size for Postgres. A small NVMe

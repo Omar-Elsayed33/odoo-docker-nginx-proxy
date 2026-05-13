@@ -1,4 +1,8 @@
+<!-- markdownlint-disable MD041 -->
 <!--
+PR templates conventionally don't begin with a top-level heading
+(the PR title is the H1). MD041 is suppressed for this file only.
+
 Thanks for the contribution. The sections below mirror what reviewers
 look for. Delete anything that doesn't apply — empty sections are
 worse than absent ones.

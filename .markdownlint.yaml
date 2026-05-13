@@ -12,14 +12,12 @@
 default: true
 
 # MD013 — line length.
-# Prose is semantically wrapped; tables and code blocks intentionally
-# carry long lines. 200 covers our prose ceiling without flagging
-# meaningful content.
-MD013:
-  line_length: 200
-  tables: false
-  code_blocks: false
-  headings: false
+# Disabled. Our prose follows semantic line breaks (one sentence per
+# line, sentences can be long), our changelog entries are intentionally
+# verbose single-line bullets, and our tables routinely exceed any
+# reasonable column-count threshold. This rule generates noise without
+# catching real bugs in this project.
+MD013: false
 
 # MD024 — multiple headings with the same content.
 # Every doc has a "## Contents" TOC. They're not siblings inside one
