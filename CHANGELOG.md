@@ -65,6 +65,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README: `Quick start` now points at `./scripts/install.sh` + `./scripts/start.sh` instead of raw `docker compose` commands. New "Operational scripts" section with the full table and one-liner cron examples.
 - Repo layout in README updated to list the eight new files under `scripts/`.
 
+### Documentation pass (v1.0 readiness)
+- README rewritten as a tight entry point: Contents TOC, "Why this stack" framing, Features table, Architecture diagram, 3-command Quick start, repo layout, Operational scripts table, Documentation link tree. Heavy content moved into per-concern docs.
+- `docs/architecture.md` — new. Design rationale split into Components / Request flow / Data flow / Network topology / Configuration model / Lifecycle / Design decisions worth flagging / What's deliberately out of scope.
+- `docs/installation.md` — new. Prerequisites table (Linux/macOS/Windows), 3-command install, what `install.sh` actually does, verifying the install, common installation issues, updating, uninstalling cleanly.
+- `docs/backup-and-restore.md` — new. What's in a backup, taking a backup, restoring (in-place / renamed / non-interactive), scheduling (cron + systemd timer), off-host shipping (restic / rclone / borg comparison + restic example), restore drills with cadence, verification, encryption options, troubleshooting table.
+- `docs/troubleshooting.md` — new. Symptom-organised catalogue of every failure mode this stack has actually hit: stack won't come up, auth failures, healthcheck failures, performance issues, backup/restore, TLS/proxy, env/config, cross-platform Windows, plus diagnostic recipes.
+- `CONTRIBUTING.md` rewritten with: Contents TOC, first-time-contributor walkthrough, expanded development workflow, Conventional Commits type table with examples, code-style sub-sections per language (shell / YAML / nginx / markdown), expanded PR checklist.
+
 ### Planned
 - Rate-limit enforcement on `/web/login` and `/web/database/*` (v0.4).
 - Let's Encrypt certbot sidecar with auto-renewal (v0.5).
