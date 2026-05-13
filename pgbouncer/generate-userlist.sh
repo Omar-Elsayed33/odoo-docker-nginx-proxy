@@ -26,10 +26,11 @@ if [[ ! -f "$ENV_FILE" ]]; then
     exit 1
 fi
 
-# Source only the two variables we care about. Using a subshell to
-# avoid leaking other .env contents into this script's environment.
+# Source only the two variables we care about. Strip CRLF first —
+# Windows editors leave \r on every line, which `eval` would happily
+# bake into the variable values and silently corrupt userlist.txt.
 # shellcheck disable=SC1090
-eval "$(grep -E '^(POSTGRES_USER|POSTGRES_PASSWORD)=' "$ENV_FILE")"
+eval "$(grep -E '^(POSTGRES_USER|POSTGRES_PASSWORD)=' "$ENV_FILE" | tr -d '\r')"
 
 : "${POSTGRES_USER:?POSTGRES_USER missing in $ENV_FILE}"
 : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD missing in $ENV_FILE}"
@@ -43,11 +44,18 @@ case "$POSTGRES_PASSWORD" in
         ;;
 esac
 
+# Write to a temp file first, then rename — atomic. Avoids leaving a
+# zero-byte userlist.txt behind if the shell is interrupted (Ctrl-C,
+# disk full, etc.) between `>` truncating the file and printf writing
+# to it. PgBouncer treats an empty file as "no users", which silently
+# breaks auth with SASL errors that are hard to diagnose.
 umask 077
-{
-    printf '"%s" "%s"\n' "$POSTGRES_USER" "$POSTGRES_PASSWORD"
-} > "$OUT"
-chmod 600 "$OUT"
+TMP="$OUT.partial.$$"
+trap 'rm -f "$TMP"' EXIT
+printf '"%s" "%s"\n' "$POSTGRES_USER" "$POSTGRES_PASSWORD" > "$TMP"
+chmod 600 "$TMP"
+mv "$TMP" "$OUT"
+trap - EXIT
 
 echo "wrote $OUT  (chmod 600)"
 echo

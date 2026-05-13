@@ -5,7 +5,9 @@
       "Bash(docker compose *)",
       "Bash(echo \"exit=$?\")",
       "Bash(chmod +x pgbouncer/generate-userlist.sh)",
-      "WebFetch(domain:hub.docker.com)"
+      "WebFetch(domain:hub.docker.com)",
+      "Bash(bash -c ' *)",
+      "Bash(bash pgbouncer/generate-userlist.sh)"
     ]
   }
 }

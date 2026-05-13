@@ -59,8 +59,10 @@ Goal: ship-it-to-a-VPS quality.
 
 Goal: you can actually run this without panic.
 
-- [ ] `scripts/backup.sh` (pg_dump + filestore tarball)
-- [ ] `scripts/restore.sh` with a documented restore drill
+- [x] `scripts/install.sh`, `start.sh`, `stop.sh`, `update.sh`, `logs.sh`
+- [x] `scripts/backup.sh` (pg_dump + filestore tarball, sha256-checksummed)
+- [x] `scripts/restore.sh` with safety prompts and checksum verification
+- [ ] Documented quarterly restore drill in `docs/`
 - [ ] Let's Encrypt sidecar (`acme.sh` or `certbot`) with auto-renewal
 - [ ] Prometheus exporters (postgres_exporter, nginx-prometheus-exporter)
 - [ ] Sample Grafana dashboards in `docs/observability/`

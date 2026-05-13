@@ -68,17 +68,15 @@ The deployment model is **standalone** — one Odoo instance, one database clust
 git clone https://github.com/<your-user>/odoo-docker-nginx-proxy.git
 cd odoo-docker-nginx-proxy
 
-# 2. Configure
-cp .env.example .env
-$EDITOR .env                       # set passwords, domain, admin password
-#                                    Odoo version defaults to 18.0
+# 2. One-time setup (.env, self-signed certs, secrets, userlist)
+./scripts/install.sh
 
 # 3. Bring it up
-docker compose up -d
+./scripts/start.sh
 
 # 4. Initialise the database (first run only)
-#    Visit https://<your-domain>/ and create the master database,
-#    or use the Odoo CLI inside the container.
+#    Visit https://localhost/ and create the master database, or use
+#    the Odoo CLI inside the container.
 ```
 
 That's it. Logs:
@@ -113,7 +111,16 @@ docker compose logs -f odoo
 │   └── generate-userlist.sh    # Generates userlist.txt from .env credentials
 ├── docs/
 │   └── pgbouncer.md            # Why PgBouncer + tuning + LISTEN/NOTIFY tradeoff
-└── scripts/                    # (future) backup.sh, restore.sh
+└── scripts/
+    ├── install.sh              # First-time setup: .env, certs, secrets, userlist
+    ├── start.sh                # Bring stack up; wait until healthy
+    ├── stop.sh                 # Bring down (--volumes to wipe data, --pause to keep)
+    ├── backup.sh               # pg_dump + filestore tar; atomic, checksummed
+    ├── restore.sh              # Reverse of backup.sh; safety prompts
+    ├── update.sh               # Pull → backup → recreate → wait-healthy
+    ├── logs.sh                 # Tail any service; --errors filter
+    └── lib/
+        └── common.sh           # Shared color logging + helpers
 ```
 
 ## Configuration
@@ -168,19 +175,29 @@ Before exposing to the internet:
 - [ ] Pin image tags to immutable digests, not floating tags.
 - [ ] Enable Docker log rotation (`json-file` with `max-size` + `max-file`).
 
-## Backups
+## Operational scripts
 
-Backups are a first-class concern, not an afterthought.
+Everything routine has a wrapper in `scripts/`. They share a tiny logging library, respect `NO_COLOR`, prompt before destructive actions, and accept `--force` for automation.
+
+| Script | What it does |
+|---|---|
+| `install.sh` | First-time setup: copies `.env.example` → `.env`, generates 40-char random passwords for the placeholders, makes a self-signed cert if `nginx/certs/` is empty, generates `pgbouncer/userlist.txt`, validates the Compose file. Idempotent. |
+| `start.sh` | Brings the stack up and waits until every service reports healthy. Prints the URL to open. |
+| `stop.sh` | Default: `docker compose down`, keeps your data. `--pause` keeps the containers around. `--volumes` wipes the named volumes (prompts for confirmation). |
+| `backup.sh` | Atomic, checksummed archive of one database: `pg_dump -Fc` (bypassing PgBouncer) + filestore tar + manifest, all sha256'd. `--keep N` enforces retention. |
+| `restore.sh` | Verifies an archive's checksum, prompts for confirmation, drops + recreates the target DB, `pg_restore -j 4`, replaces the filestore, restarts Odoo. |
+| `update.sh` | Takes a safety backup of every DB, pulls new images, recreates only changed services, waits healthy, prints the version diff. |
+| `logs.sh` | `docker compose logs` wrapper with sensible defaults (`--follow`, last 200) and an `--errors` mode that greps for ERROR/FATAL/WARN/Traceback. |
 
 ```bash
-# Full backup (database dump + filestore)
-./scripts/backup.sh
-
-# Restore from a backup archive
-./scripts/restore.sh backups/odoo-2026-01-15.tar.gz
+# Daily life
+./scripts/backup.sh --keep 7         # nightly cron-friendly
+./scripts/logs.sh odoo --errors      # what broke?
+./scripts/restore.sh backups/<file>  # roll forward (or back)
+./scripts/update.sh                  # patch-update Odoo / Postgres / nginx
 ```
 
-Backups are written to `./backups/` by default. Ship them off-host (S3, B2, restic — your choice) on a schedule via cron or a sidecar container.
+Backups land in `./backups/` and are gitignored. Ship them off-host (S3, B2, restic — your choice) on a schedule; the archives are self-contained and verifiable via their manifest.
 
 ## Operating notes
 
