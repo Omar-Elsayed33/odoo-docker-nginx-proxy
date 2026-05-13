@@ -91,22 +91,20 @@ docker compose logs -f odoo
 
 ```
 .
-├── docker-compose.yml          # Service definitions
+├── docker-compose.yml          # Service definitions (Odoo + Postgres today)
 ├── .env.example                # Documented environment template
-├── config/
-│   ├── odoo.conf               # Odoo server config (workers, addons path, db host)
-│   └── nginx/
-│       ├── nginx.conf          # Top-level Nginx config
-│       └── conf.d/
-│           └── odoo.conf       # vhost: TLS, websockets, proxy_pass
-├── pgbouncer/
-│   ├── pgbouncer.ini           # Pool mode, sizes
-│   └── userlist.txt            # SCRAM-SHA-256 credentials (generated)
-├── addons/                     # Mounted into Odoo as a custom addons path
-├── scripts/
-│   ├── backup.sh               # pg_dump + filestore tarball
-│   └── restore.sh              # Reverse of backup.sh
-└── docs/                       # ADRs, runbooks
+├── odoo/
+│   ├── config/
+│   │   └── odoo.conf           # Odoo server config (workers, addons path, limits)
+│   └── addons/                 # Mounted into Odoo at /mnt/extra-addons
+├── postgres/
+│   └── init/                   # First-boot SQL/sh scripts for the cluster
+│       ├── README.md
+│       └── 10-extensions.sql.example
+├── config/                     # (future) Nginx vhost, certs
+├── pgbouncer/                  # (future) Pool config + userlist
+├── scripts/                    # (future) backup.sh, restore.sh
+└── docs/                       # (future) ADRs, runbooks
 ```
 
 ## Configuration
@@ -155,7 +153,7 @@ Before exposing to the internet:
 - [ ] Confirm `ODOO_VERSION=18.0` (or your deliberate, tested override).
 - [ ] Set strong `POSTGRES_PASSWORD` and `ODOO_ADMIN_PASSWD` (≥ 32 chars).
 - [ ] Replace the self-signed TLS cert with a real one (Let's Encrypt or commercial CA).
-- [ ] Set `list_db = False` in `config/odoo.conf` to disable the database manager.
+- [ ] Set `list_db = False` in `odoo/config/odoo.conf` to disable the database manager.
 - [ ] Restrict `/web/database/*` endpoints in Nginx.
 - [ ] Configure off-host backups (see [`scripts/backup.sh`](scripts/backup.sh)).
 - [ ] Pin image tags to immutable digests, not floating tags.

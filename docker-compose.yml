@@ -1,0 +1,140 @@
+# ─────────────────────────────────────────────────────────────────────
+# odoo-docker-nginx-proxy — base standalone stack
+#
+# Services in this file:
+#   - db   : PostgreSQL (the only database supported by Odoo)
+#   - odoo : Odoo application server
+#
+# Not in this file (yet, by design):
+#   - Nginx reverse proxy   — added in a follow-up PR
+#   - PgBouncer connection  — added in a follow-up PR
+#
+# Bring it up with:
+#   cp .env.example .env && $EDITOR .env
+#   docker compose up -d
+#
+# Convention: every tunable comes from .env. Do not hard-code values
+# here that an operator should be able to change without editing YAML.
+# ─────────────────────────────────────────────────────────────────────
+
+name: ${COMPOSE_PROJECT_NAME:-odoo}
+
+# ─── Reusable defaults ───────────────────────────────────────────────
+# Pulled into both services so logging is consistent across the stack.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  # ───────────────────────────────────────────────────────────────────
+  # PostgreSQL
+  # ───────────────────────────────────────────────────────────────────
+  # The data directory lives on a named volume so it survives container
+  # rebuilds. PGDATA is pinned inside a subdirectory of the volume so
+  # init scripts can co-exist with the cluster without confusing the
+  # postgres entrypoint.
+  # Port 5432 is intentionally NOT published to the host — only the
+  # internal `odoo-net` network can reach it.
+  db:
+    image: postgres:${POSTGRES_VERSION:-16}-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo}-db
+    restart: unless-stopped
+    stop_grace_period: 1m
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: ${TZ:-UTC}
+    volumes:
+      # Persistent cluster data. The volume name is taken from
+      # POSTGRES_VOLUME so you can rename it when migrating between
+      # Postgres majors (a major upgrade is a new volume, not an
+      # in-place change).
+      - pgdata:/var/lib/postgresql/data
+      # First-boot init scripts. Anything in postgres/init/ ending in
+      # .sh / .sql / .sql.gz runs once when the cluster is empty.
+      # See postgres/init/README.md for what goes here.
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - odoo-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging: *default-logging
+
+  # ───────────────────────────────────────────────────────────────────
+  # Odoo
+  # ───────────────────────────────────────────────────────────────────
+  # The image is resolved from ODOO_IMAGE (preferred) or built from
+  # ODOO_VERSION as a fallback. See .env.example for the version
+  # strategy — switching majors is a database migration, not a tweak.
+  #
+  # The ports below bind to 127.0.0.1 only. This stack is "standalone"
+  # but not "internet-facing" — Nginx (next PR) will be the public
+  # entry point. On a remote host, reach Odoo via SSH tunnel until
+  # then:
+  #   ssh -L 8069:127.0.0.1:8069 user@host
+  odoo:
+    image: ${ODOO_IMAGE:-odoo:${ODOO_VERSION:-18.0}}
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo}-app
+    restart: unless-stopped
+    stop_grace_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Consumed by the official Odoo image entrypoint to build the
+      # database connection. Anything else goes through odoo.conf.
+      HOST: db
+      PORT: 5432
+      USER: ${POSTGRES_USER}
+      PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ:-UTC}
+    volumes:
+      # Filestore + sessions + addons cache. Named volume keeps it
+      # decoupled from the container lifecycle.
+      - odoo-data:/var/lib/odoo
+      # Server config, mounted read-only so a compromised container
+      # cannot rewrite it.
+      - ./odoo/config:/etc/odoo:ro
+      # Custom addons path. Drop your modules into ./odoo/addons/ and
+      # they appear inside the container at /mnt/extra-addons.
+      - ./odoo/addons:/mnt/extra-addons
+    ports:
+      - "127.0.0.1:8069:8069"   # HTTP / XML-RPC
+      - "127.0.0.1:8072:8072"   # Longpolling / gevent (chat, bus)
+    networks:
+      - odoo-net
+    healthcheck:
+      # /web/health is an unauthenticated, lightweight endpoint that
+      # returns 200 once the worker pool is accepting requests.
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8069/web/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging: *default-logging
+
+# ─── Volumes ─────────────────────────────────────────────────────────
+# Named so they survive `docker compose down` (use `down -v` to wipe).
+# The name fields make the volumes greppable in `docker volume ls` and
+# decouple them from the compose project name.
+volumes:
+  pgdata:
+    name: ${POSTGRES_VOLUME:-odoo-pgdata}
+  odoo-data:
+    name: ${COMPOSE_PROJECT_NAME:-odoo}-filestore
+
+# ─── Networks ────────────────────────────────────────────────────────
+# Single private bridge. Nothing on this network is reachable from
+# outside Docker except the ports explicitly published above.
+networks:
+  odoo-net:
+    name: ${COMPOSE_PROJECT_NAME:-odoo}-net
+    driver: bridge

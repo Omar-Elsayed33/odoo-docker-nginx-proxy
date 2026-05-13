@@ -1,0 +1,20 @@
+# Drop your custom Odoo addons in this directory.
+#
+# Each addon lives in its own subdirectory at the top level here:
+#
+#   odoo/addons/
+#   ├── my_module_a/
+#   │   ├── __init__.py
+#   │   ├── __manifest__.py
+#   │   └── ...
+#   └── my_module_b/
+#       └── ...
+#
+# This directory is mounted into the Odoo container at
+# /mnt/extra-addons (see docker-compose.yml) and registered in the
+# addons_path of odoo.conf.
+#
+# After adding a module, install it from the Odoo UI (Apps menu) or
+# from the CLI inside the container:
+#
+#   docker compose exec odoo odoo -d <db_name> -i <module_name> --stop-after-init
