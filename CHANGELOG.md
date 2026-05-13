@@ -51,11 +51,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `odoo` service now `depends_on: pgbouncer (service_healthy)` and routes through it via `HOST=${ODOO_DB_HOST:-pgbouncer}` / `PORT=${ODOO_DB_PORT:-6432}`. `.env` can flip those back to `db` / `5432` to bypass the pool.
 - `.env.example`: dropped the unused `PGBOUNCER_POOL_MODE` / `_MAX_CLIENT_CONN` / `_DEFAULT_POOL_SIZE` / `_RESERVE_POOL_*` knobs (PgBouncer does not envsubst its config). Added `PGBOUNCER_VERSION`, `ODOO_DB_HOST`, `ODOO_DB_PORT`. Comment explains tuning is via `pgbouncer.ini`.
 
+### Added (operational scripts)
+- `scripts/lib/common.sh` — shared color logging (respects `NO_COLOR` and non-TTY), `confirm` prompt with `--force` / `FORCE=1` bypass, `compose` wrapper that always runs from the repo root, `wait_healthy` with timeout, safe `load_env_var` (no `source` of `.env`).
+- `scripts/install.sh` — idempotent first-time setup. Copies `.env.example` → `.env`, fills placeholder `POSTGRES_PASSWORD` / `ODOO_ADMIN_PASSWD` with `openssl rand`, generates self-signed TLS if `nginx/certs/` is empty, generates `pgbouncer/userlist.txt`, validates `docker compose config`. Never overwrites a hand-customised file.
+- `scripts/start.sh` — preflight checks, `compose up -d`, waits for `db → pgbouncer → odoo → nginx` to all be healthy (180 s each), prints the access URL using `NGINX_HTTPS_PORT` from `.env`.
+- `scripts/stop.sh` — `compose down` by default. `--pause` runs `compose stop` (keeps containers); `--volumes` wipes named volumes after a confirmation prompt.
+- `scripts/backup.sh` — atomic, checksummed archive: `pg_dump -Fc` (direct to Postgres, bypassing PgBouncer because tx-mode pooling is incompatible with `pg_dump`'s snapshot semantics) + filestore tar + sha256-stamped manifest. Built in a temp dir and `mv`d into place so an interrupted backup leaves nothing partial. `--keep N` retention. `--database` for multi-DB clusters.
+- `scripts/restore.sh` — verifies the archive's manifest sha256 before doing anything destructive, prompts (skippable via `--force`), kicks active sessions, drops + recreates the DB, `pg_restore -j 4`, replaces the filestore, waits for `/web/health`. `--target` to restore into a renamed DB.
+- `scripts/update.sh` — takes a safety backup of every Odoo DB first (skippable via `--no-backup`), pulls images, recreates only changed services, waits healthy, prints a before/after image-diff. Comments explicitly forbid using it for major Odoo version jumps.
+- `scripts/logs.sh` — `compose logs` wrapper. Sensible defaults (`--follow`, `--tail=200`), `--errors` mode that filters to ERROR/FATAL/WARN/Traceback lines.
+
+### Changed (operational scripts)
+- README: `Quick start` now points at `./scripts/install.sh` + `./scripts/start.sh` instead of raw `docker compose` commands. New "Operational scripts" section with the full table and one-liner cron examples.
+- Repo layout in README updated to list the eight new files under `scripts/`.
+
 ### Planned
 - Rate-limit enforcement on `/web/login` and `/web/database/*` (v0.4).
-- `scripts/backup.sh` and `scripts/restore.sh`.
 - Let's Encrypt certbot sidecar with auto-renewal (v0.5).
-- CI pipeline (lint, compose config validation, hadolint).
+- CI pipeline (lint, compose config validation, hadolint, shellcheck on scripts/).
 
 ---
 
