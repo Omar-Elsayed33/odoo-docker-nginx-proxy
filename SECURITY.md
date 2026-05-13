@@ -16,7 +16,7 @@ This project is in early development. Only the `main` branch and the latest tagg
 
 Instead:
 
-1. Email **security@dgtera.com** (or open a [private GitHub security advisory](https://docs.github.com/en/code-security/security-advisories/repository-security-advisories/privately-reporting-a-security-vulnerability)).
+1. Email **<omar.elsayed33@gmail.com>** (or open a [private GitHub security advisory](https://docs.github.com/en/code-security/security-advisories/repository-security-advisories/privately-reporting-a-security-vulnerability)).
 2. Include:
    - A clear description of the issue and its impact.
    - Steps to reproduce, or a proof-of-concept.

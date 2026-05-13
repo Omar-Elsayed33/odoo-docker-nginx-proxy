@@ -1,0 +1,102 @@
+name: Bug report
+description: Something doesn't work the way the docs say it should
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **Before submitting**, please:
+
+        - Skim [`docs/troubleshooting.md`](https://github.com/Omar-Elsayed33/odoo-docker-nginx-proxy/blob/main/docs/troubleshooting.md) — a lot of failure modes are catalogued there.
+        - Run `./scripts/logs.sh --errors --no-follow --since 10m` and check whether the error message appears in the docs.
+
+        Issues with redacted logs and a clear reproduction get fixed dramatically faster than "it broke."
+
+  - type: input
+    id: ref
+    attributes:
+      label: Git commit / tag
+      description: Output of `git rev-parse --short HEAD` or `git describe --tags --always`.
+      placeholder: "e.g. abc1234 or v0.5.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Linux (server)
+        - Linux (desktop)
+        - macOS
+        - Windows (Docker Desktop + Git Bash)
+        - Windows (Docker Desktop + WSL 2)
+        - Other (describe in "what happened")
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the problem and the exact command(s) you ran.
+      placeholder: |
+        I ran `./scripts/backup.sh` and got "no application databases found" even though I have a database I can log into via the UI.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      placeholder: "A backup archive in ./backups/."
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        Paste the output of:
+        ```
+        ./scripts/logs.sh --errors --no-follow --since 10m
+        ```
+        Redact passwords / secrets before pasting.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: compose-ps
+    attributes:
+      label: docker compose ps
+      description: "Paste the output of `docker compose ps`."
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Sanitised .env
+      description: |
+        Paste the output of:
+        ```
+        grep -v -E "PASSWORD|PASSWD|SECRET" .env
+        ```
+        Optional but speeds up triage.
+      render: bash
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submit checks
+      options:
+        - label: I've redacted passwords / secrets from the logs and env above.
+          required: true
+        - label: I've checked `docs/troubleshooting.md` and this isn't already documented.
+          required: true

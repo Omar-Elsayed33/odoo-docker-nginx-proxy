@@ -40,16 +40,20 @@ a contribution is mechanical; here's a tight walkthrough.
 1. **Fork** the repository on GitHub (button in the top-right of the
    repo page).
 2. **Clone** your fork locally:
+
    ```bash
    git clone https://github.com/<your-username>/odoo-docker-nginx-proxy.git
    cd odoo-docker-nginx-proxy
    git remote add upstream https://github.com/<original-owner>/odoo-docker-nginx-proxy.git
    ```
+
 3. **Bring the stack up** so you have something to test against:
+
    ```bash
    ./scripts/install.sh
    ./scripts/start.sh
    ```
+
 4. **Make your change** on a feature branch (see naming convention below).
 5. **Test it** locally — `docker compose config --quiet` at minimum;
    for behavioural changes, restart the affected services and verify.

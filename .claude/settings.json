@@ -8,7 +8,19 @@
       "WebFetch(domain:hub.docker.com)",
       "Bash(bash -c ' *)",
       "Bash(bash pgbouncer/generate-userlist.sh)",
-      "Bash(echo \"rc=$?\")"
+      "Bash(echo \"rc=$?\")",
+      "Bash(gh pr *)",
+      "PowerShell(gh pr view 7 --json title,headRefName,baseRefName,mergeable,mergeStateStatus,files 2>&1)",
+      "Bash(git fetch *)",
+      "Bash(curl -sS https://api.github.com/repos/Omar-Elsayed33/odoo-docker-nginx-proxy/pulls/7)",
+      "Bash(git merge *)",
+      "Bash(git stash *)",
+      "Bash(grep -rnE *)",
+      "Bash(git add *)",
+      "Bash(git commit --no-verify -m ' *)",
+      "Bash(git push *)",
+      "Bash(docker run --rm -v __TRACKED_VAR__:/mnt:ro -w /mnt odoo:18.0 python3 -c ' *)",
+      "Bash(docker run *)"
     ]
   }
 }

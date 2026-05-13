@@ -1,0 +1,57 @@
+name: Feature request
+description: Suggest a new capability for the stack
+title: "[feat] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before submitting, please check:
+
+        - [`ROADMAP.md`](https://github.com/Omar-Elsayed33/odoo-docker-nginx-proxy/blob/main/ROADMAP.md) — is this already planned for a future milestone?
+        - [`ROADMAP.md` → "Explicitly out of scope"](https://github.com/Omar-Elsayed33/odoo-docker-nginx-proxy/blob/main/ROADMAP.md#explicitly-out-of-scope) — is this something this project deliberately doesn't do?
+
+        Concrete production pain points carry more weight than "it would be nice if".
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What are you trying to do that the stack makes hard right now?
+      placeholder: |
+        I'm running 3 Odoo replicas behind one PgBouncer and the
+        default_pool_size = 25 is too small under load. SHOW POOLS
+        shows cl_waiting in the double digits during peak.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like to see? A rough sketch is enough — implementation details aren't required.
+      placeholder: |
+        Expose default_pool_size as an env var (PGBOUNCER_POOL_SIZE)
+        and template it into pgbouncer.ini at container start, so
+        operators can tune without editing the .ini directly.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What did you consider doing instead?
+      placeholder: |
+        Editing pgbouncer.ini directly works but means the source-of-truth
+        for tuning is split between .env (sizing limits) and a separate file.
+
+  - type: checkboxes
+    id: scope-check
+    attributes:
+      label: Scope check
+      options:
+        - label: I've read the "Explicitly out of scope" section in ROADMAP.md and this is not on it.
+          required: true
+        - label: This belongs in the base stack, not as a fork or downstream add-on.
+          required: true

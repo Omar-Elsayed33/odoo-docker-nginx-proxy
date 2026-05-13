@@ -1,0 +1,17 @@
+# Disable the "open a blank issue" link — every issue should go
+# through one of the structured forms above, or one of the contact
+# links below.
+blank_issues_enabled: false
+
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Omar-Elsayed33/odoo-docker-nginx-proxy/security/policy
+    about: >-
+      Please report security issues privately, NOT through a public issue.
+      See SECURITY.md for the disclosure process and expected response timeline.
+
+  - name: Question or discussion
+    url: https://github.com/Omar-Elsayed33/odoo-docker-nginx-proxy/discussions
+    about: >-
+      Use Discussions for questions, deployment war stories, and design
+      conversations. Issues are reserved for bug reports and feature requests.

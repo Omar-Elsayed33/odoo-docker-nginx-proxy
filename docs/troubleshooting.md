@@ -56,10 +56,10 @@ you the actual reason:
 ```
 
 The most common offenders and their entries in this document:
+
 - pgbouncer: see [PgBouncer ERROR: unknown parameter](#pgbouncer-error-unknown-parameter-pgbouncerdaemon)
 - pgbouncer: see [PgBouncer SASL authentication failed](#pgbouncer-sasl-authentication-failed)
-- db: see [Postgres rejects auth as POSTGRES_USER](#postgres-rejects-auth-as-postgres_user)
-- odoo: see [Odoo can't connect to the database](#odoo-cant-connect-to-the-database)
+- db: see [Postgres rejects auth as POSTGRES_USER](#postgres-rejects-auth-as-postgres_user) (Odoo failures with the same root cause point here too)
 
 ### Containers loop on `touch: /etc/pgbouncer/userlist.txt: Read-only file system`
 
@@ -121,12 +121,15 @@ to `.env` don't propagate.
 Fix paths, choose one:
 
 - **Nuke and pave** (if you have no real data):
+
   ```bash
   docker compose down -v
   ./scripts/install.sh    # fills any remaining placeholder secrets
   ./scripts/start.sh
   ```
+
 - **Rotate in place** (preserves data):
+
   ```bash
   # Set a new password in .env, then:
   docker compose exec db psql -U "$POSTGRES_USER" -c \

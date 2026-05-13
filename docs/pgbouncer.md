@@ -53,6 +53,7 @@ Four specifics make Odoo particularly sensitive to this:
    backends.
 
 The practical win on a real Odoo deployment is roughly:
+
 - **Latency**: 5–30 ms shaved off small queries (no backend fork).
 - **Memory**: 5–10× fewer Postgres backends for the same workload.
 - **Resilience**: a connection spike (e.g. an import job, a poorly
@@ -200,6 +201,7 @@ docker compose exec pgbouncer \
 ```
 
 Look at:
+
 - `cl_active` — clients currently using a backend
 - `cl_waiting` — clients waiting for a slot (should be 0)
 - `sv_active` — backends in use
