@@ -10,13 +10,40 @@
 
 ---
 
-## Overview
+## Contents
 
-This project provides a **batteries-included, reproducible Odoo deployment** that you can spin up locally, on a VPS, or behind any orchestrator that speaks Docker Compose. It is opinionated where it matters (security defaults, connection pooling, reverse-proxy hardening) and unopinionated where it shouldn't be (custom modules, themes, business logic).
+- [Why this stack](#why-this-stack)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Quick start](#quick-start)
+- [Repository layout](#repository-layout)
+- [Operational scripts](#operational-scripts)
+- [Documentation](#documentation)
+- [License](#license)
 
-The deployment model is **standalone** — one Odoo instance, one database cluster, fronted by one reverse proxy. This is not a SaaS / multi-tenant template.
+---
 
-> **Default Odoo version: 18.0.** This is the version the stack is built, tested, and supported against. Other major versions are not the target for this repository — see [Switching Odoo versions](#switching-odoo-versions) below.
+## Why this stack
+
+Standing up Odoo for production is **not** the same as `docker run odoo`. You need a reverse proxy that knows how to forward Odoo's websocket bus. You need a connection pooler in front of Postgres or every cold request pays a backend-startup tax. You need backups that survive an interrupted run. You need TLS termination, security headers, and a way to update without losing data.
+
+This repository ships all of that as a small, opinionated, **standalone** Compose stack — readable in five minutes, deployable in fifteen. It is not a SaaS template, not a Kubernetes platform, and not a place for your custom modules. It is the boring, correct base on which the interesting work happens.
+
+---
+
+## Features
+
+| Area | What you get |
+|---|---|
+| **Reverse proxy** | Nginx vhost with TLS 1.2/1.3 (Mozilla intermediate), HTTP→HTTPS redirect, websocket upgrade for Odoo's bus, gzip, security headers (HSTS, X-Frame, Referrer-Policy, COOP/CORP), static-asset caching, rate-limit zones |
+| **Connection pooling** | PgBouncer in transaction mode; SCRAM-SHA-256 end-to-end; wildcard DB route; documented sizing rule-of-thumb; bypass switch for session-mode workloads |
+| **Persistence** | Named volumes for Postgres cluster and Odoo filestore; first-boot init script directory; configurable per-environment volume names |
+| **Backups** | `pg_dump -Fc` + filestore tar + sha256-stamped manifest in a single atomic archive; retention policy; checksum verification on restore |
+| **Operational scripts** | `install / start / stop / backup / restore / update / logs`, all sharing one logging library and respecting `NO_COLOR` |
+| **Production overrides** | Separate `docker-compose.prod.yml` with `cap_drop`, `no-new-privileges`, resource limits, tighter healthchecks — auto-loaded via `COMPOSE_FILE` in `.env` |
+| **Documentation** | One doc per concern (architecture, install, backup, pgbouncer, production, troubleshooting) — each readable in under 15 minutes |
+
+---
 
 ## Architecture
 
@@ -29,7 +56,7 @@ The deployment model is **standalone** — one Odoo instance, one database clust
                               ┌───────────────────┐
                               │      Nginx        │  TLS termination,
                               │  (reverse proxy)  │  gzip, websockets,
-                              │                   │  rate limiting
+                              │                   │  security headers
                               └─────────┬─────────┘
                                         │ 8069 / 8072 (longpolling)
                                         ▼
@@ -48,176 +75,115 @@ The deployment model is **standalone** — one Odoo instance, one database clust
                                         ▼
                               ┌───────────────────┐
                               │    PostgreSQL     │  Persistent storage
-                              │   (data volume)   │  WAL + tuned config
+                              │   (data volume)   │  + filestore alongside
                               └───────────────────┘
 ```
 
-### Why each layer exists
+Read the design rationale in **[docs/architecture.md](docs/architecture.md)** — why each layer exists, what flows where, and which decisions are deliberately reversible vs. load-bearing.
 
-| Layer | Role | Why it matters |
-|-------|------|----------------|
-| **Nginx** | Reverse proxy, TLS termination, static asset caching, websocket upgrade for Odoo longpolling. | Keeps Odoo off the public network, enables HTTPS, and offloads connection handling. |
-| **Odoo** | The application. Runs HTTP workers + a dedicated longpolling worker. | Multi-worker setup is required for any non-toy deployment. |
-| **PgBouncer** | Transaction-mode connection pool between Odoo workers and PostgreSQL. | Odoo opens many short-lived connections; PgBouncer prevents PG from being overwhelmed and reduces latency. |
-| **PostgreSQL** | The database. | Odoo's only supported RDBMS. Tuned for OLTP-style workloads. |
+---
 
 ## Quick start
 
+> Prerequisites: Docker Engine 24+, Docker Compose v2.20+, `bash`, `openssl`. On Windows, use Git Bash or WSL for any `./scripts/*.sh` invocation.
+
 ```bash
-# 1. Clone
 git clone https://github.com/<your-user>/odoo-docker-nginx-proxy.git
 cd odoo-docker-nginx-proxy
 
-# 2. One-time setup (.env, self-signed certs, secrets, userlist)
-./scripts/install.sh
-
-# 3. Bring it up
-./scripts/start.sh
-
-# 4. Initialise the database (first run only)
-#    Visit https://localhost/ and create the master database, or use
-#    the Odoo CLI inside the container.
+./scripts/install.sh    # .env, random passwords, self-signed cert, userlist
+./scripts/start.sh      # bring up; waits for every service to be healthy
 ```
 
-That's it. Logs:
+Open **<https://localhost/>** in a browser, accept the self-signed cert warning, and create your first database via Odoo's database manager.
 
-```bash
-docker compose logs -f odoo
-```
+For production targets (Linux VPS, real domain, real CA), follow **[docs/installation.md](docs/installation.md)** end-to-end.
+
+---
 
 ## Repository layout
 
 ```
 .
-├── docker-compose.yml          # Service definitions (Odoo + Postgres today)
-├── .env.example                # Documented environment template
+├── docker-compose.yml          # Base service definitions
+├── docker-compose.prod.yml     # Production overrides (caps, limits, restart)
+├── .env.example                # Local-dev env template
+├── .env.prod.example           # Production env template
+│
 ├── odoo/
-│   ├── config/
-│   │   └── odoo.conf           # Odoo server config (workers, addons path, limits)
-│   └── addons/                 # Mounted into Odoo at /mnt/extra-addons
-├── postgres/
-│   └── init/                   # First-boot SQL/sh scripts for the cluster
-│       ├── README.md
-│       └── 10-extensions.sql.example
-├── nginx/
-│   ├── README.md               # Reverse-proxy architecture, ops, customisation
-│   ├── conf.d/
-│   │   └── odoo.conf           # Vhost: upstreams, TLS, websocket, static cache
-│   ├── templates/              # Reusable snippets (TLS, security, gzip, proxy)
-│   └── certs/                  # TLS material (gitignored except README.md)
+│   ├── config/odoo.conf        # Server config (workers, limits, longpolling)
+│   └── addons/                 # Mounted at /mnt/extra-addons in the container
+│
+├── postgres/init/              # First-boot SQL/sh scripts (idempotent)
+│
 ├── pgbouncer/
-│   ├── pgbouncer.ini           # Pool config (transaction mode, sizing, timeouts)
-│   ├── userlist.txt.example    # userlist.txt format reference (real file gitignored)
-│   └── generate-userlist.sh    # Generates userlist.txt from .env credentials
-├── docker-compose.prod.yml     # Production overrides (caps, limits, log rot, restart)
-├── .env.prod.example           # Production env template (real domain, stronger sizing)
+│   ├── pgbouncer.ini           # Transaction-mode pool config
+│   ├── userlist.txt.example    # Real file gitignored
+│   └── generate-userlist.sh    # Derives userlist.txt from .env
+│
+├── nginx/
+│   ├── conf.d/odoo.conf        # Vhost: upstreams, TLS, websocket, static cache
+│   ├── templates/              # Reusable snippets (TLS, security, gzip, proxy)
+│   ├── certs/                  # TLS material (gitignored except README.md)
+│   └── README.md               # Reverse-proxy architecture + runbook
+│
 ├── docs/
-│   ├── pgbouncer.md            # Why PgBouncer + tuning + LISTEN/NOTIFY tradeoff
-│   └── production-deployment.md  # Server prep, SSL, backups, monitoring, scaling, runbook
+│   ├── architecture.md         # Design decisions, request flow, data flow
+│   ├── installation.md         # Step-by-step install (dev + VPS)
+│   ├── backup-and-restore.md   # backup.sh + restore.sh + drill cadence
+│   ├── pgbouncer.md            # Why PgBouncer + tuning + LISTEN/NOTIFY
+│   ├── production-deployment.md# Server prep, SSL, monitoring, scaling, runbook
+│   └── troubleshooting.md      # Every failure mode this stack has hit
+│
 └── scripts/
-    ├── install.sh              # First-time setup: .env, certs, secrets, userlist
-    ├── start.sh                # Bring stack up; wait until healthy
-    ├── stop.sh                 # Bring down (--volumes to wipe data, --pause to keep)
-    ├── backup.sh               # pg_dump + filestore tar; atomic, checksummed
-    ├── restore.sh              # Reverse of backup.sh; safety prompts
-    ├── update.sh               # Pull → backup → recreate → wait-healthy
-    ├── logs.sh                 # Tail any service; --errors filter
-    └── lib/
-        └── common.sh           # Shared color logging + helpers
+    ├── install.sh   start.sh   stop.sh
+    ├── backup.sh    restore.sh update.sh   logs.sh
+    └── lib/common.sh           # Color logging + helpers (sourced by all)
 ```
 
-## Configuration
-
-All configuration lives in `.env` and the files under `config/`. The `.env` file is the **only** thing you should need to edit for a vanilla deployment.
-
-See [`.env.example`](.env.example) for the full list of variables, each with inline documentation.
-
-### Version strategy
-
-The Odoo image and tag are controlled by a single variable in `.env`:
-
-```bash
-ODOO_VERSION=18.0          # default — tested, supported
-ODOO_IMAGE=odoo:${ODOO_VERSION}
-```
-
-Pinning is centralised. Don't hard-code an image tag inside `docker-compose.yml` — change `ODOO_VERSION` (or override `ODOO_IMAGE` outright) and let Compose interpolate.
-
-### Switching Odoo versions
-
-> **Read this before changing `ODOO_VERSION`.** A version bump is a database migration, not a config tweak.
-
-- **Odoo 18.0 is the default and only tested version** for this repository. The Nginx vhost, `odoo.conf` defaults, PgBouncer pool sizing, and backup scripts are calibrated against 18.0.
-- Other major versions (e.g. 17.0, 19.0) are **not** the default target. They may work, but expect at minimum:
-  - Different custom-addon API compatibility (Odoo's ORM and view syntax change across majors).
-  - Different default config keys in `odoo.conf` (e.g. worker / longpolling flags have been renamed historically).
-  - Database schema incompatibility — an Odoo 18 filestore + database **cannot** be opened by Odoo 17, and moving to Odoo 19 requires running Odoo's migration tooling against a copy.
-- **Never switch versions on a live production database without:**
-  1. A verified, restorable backup (run [`scripts/restore.sh`](scripts/restore.sh) against a clean stack and confirm the data loads).
-  2. A staging environment running the target version with a copy of prod data.
-  3. A migration plan — either OpenUpgrade for community modules or a paid Odoo migration service for enterprise.
-  4. A rollback plan (image tag + backup) you have actually rehearsed.
-- To experiment with a different version locally:
-  ```bash
-  # In a throwaway .env, never on prod
-  ODOO_VERSION=19.0
-  POSTGRES_VOLUME=odoo-pgdata-19   # isolate the data dir per major
-  ```
-  Always pair a version bump with a renamed `POSTGRES_VOLUME` so you cannot accidentally point a new Odoo at an old database.
-
-### Production checklist
-
-Before exposing to the internet:
-
-- [ ] Confirm `ODOO_VERSION=18.0` (or your deliberate, tested override).
-- [ ] Set strong `POSTGRES_PASSWORD` and `ODOO_ADMIN_PASSWD` (≥ 32 chars).
-- [ ] Replace the self-signed TLS cert with a real one (Let's Encrypt or commercial CA).
-- [ ] Set `list_db = False` in `odoo/config/odoo.conf` to disable the database manager.
-- [ ] Restrict `/web/database/*` endpoints in Nginx.
-- [ ] Configure off-host backups (see [`scripts/backup.sh`](scripts/backup.sh)).
-- [ ] Pin image tags to immutable digests, not floating tags.
-- [ ] Enable Docker log rotation (`json-file` with `max-size` + `max-file`).
+---
 
 ## Operational scripts
 
-Everything routine has a wrapper in `scripts/`. They share a tiny logging library, respect `NO_COLOR`, prompt before destructive actions, and accept `--force` for automation.
+Every routine action has a wrapper under `scripts/`. They share one logging library, respect `NO_COLOR`, prompt before destructive operations, and accept `--force` for automation.
 
-| Script | What it does |
+| Script | Purpose |
 |---|---|
-| `install.sh` | First-time setup: copies `.env.example` → `.env`, generates 40-char random passwords for the placeholders, makes a self-signed cert if `nginx/certs/` is empty, generates `pgbouncer/userlist.txt`, validates the Compose file. Idempotent. |
-| `start.sh` | Brings the stack up and waits until every service reports healthy. Prints the URL to open. |
-| `stop.sh` | Default: `docker compose down`, keeps your data. `--pause` keeps the containers around. `--volumes` wipes the named volumes (prompts for confirmation). |
-| `backup.sh` | Atomic, checksummed archive of one database: `pg_dump -Fc` (bypassing PgBouncer) + filestore tar + manifest, all sha256'd. `--keep N` enforces retention. |
-| `restore.sh` | Verifies an archive's checksum, prompts for confirmation, drops + recreates the target DB, `pg_restore -j 4`, replaces the filestore, restarts Odoo. |
-| `update.sh` | Takes a safety backup of every DB, pulls new images, recreates only changed services, waits healthy, prints the version diff. |
-| `logs.sh` | `docker compose logs` wrapper with sensible defaults (`--follow`, last 200) and an `--errors` mode that greps for ERROR/FATAL/WARN/Traceback. |
+| `install.sh` | First-time setup: `.env`, random passwords, self-signed cert, `pgbouncer/userlist.txt`, `docker compose config` validate. **Idempotent.** |
+| `start.sh` | `compose up -d`, then waits for `db → pgbouncer → odoo → nginx` to all report healthy. Prints the access URL. |
+| `stop.sh` | `compose down` (keeps data). `--pause` keeps containers; `--volumes` wipes data with a confirmation prompt. |
+| `backup.sh` | Atomic, checksummed archive: `pg_dump -Fc` (direct to Postgres) + filestore tar + manifest. `--keep N` retention. |
+| `restore.sh` | Verifies the archive sha256, prompts, drops + recreates the DB, `pg_restore -j 4`, replaces the filestore, waits for `/web/health`. |
+| `update.sh` | Safety-backups every DB, pulls images, recreates changed services, waits healthy, prints the version diff. |
+| `logs.sh` | `compose logs` wrapper with sensible defaults; `--errors` filters to ERROR/FATAL/WARN/Traceback. |
 
-```bash
-# Daily life
-./scripts/backup.sh --keep 7         # nightly cron-friendly
-./scripts/logs.sh odoo --errors      # what broke?
-./scripts/restore.sh backups/<file>  # roll forward (or back)
-./scripts/update.sh                  # patch-update Odoo / Postgres / nginx
-```
+Production usage is identical — once `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml` is set in `.env` on the server, every script transparently applies the production overrides.
 
-Backups land in `./backups/` and are gitignored. Ship them off-host (S3, B2, restic — your choice) on a schedule; the archives are self-contained and verifiable via their manifest.
-
-## Operating notes
-
-- **Worker count**: Tune `WORKERS` in `.env` to `(2 × CPU) + 1` as a starting point. The longpolling worker is separate and always-on.
-- **Memory limits**: Each worker is capped via `limit_memory_hard` / `limit_memory_soft` in `odoo.conf`. Adjust to your host.
-- **Updating Odoo within a major**: Bump the Odoo image digest (not the major version) in your registry pin, pull, and `docker compose up -d`. Test on a staging copy of prod first — even point releases can carry data migrations.
-- **Updating Odoo across majors**: See [Switching Odoo versions](#switching-odoo-versions). This is a migration project, not a deploy.
+---
 
 ## Documentation
 
-- [docs/production-deployment.md](docs/production-deployment.md) — taking the stack live on a Linux server
-- [docs/pgbouncer.md](docs/pgbouncer.md) — why PgBouncer matters, sizing, LISTEN/NOTIFY trade-offs
-- [nginx/README.md](nginx/README.md) — reverse-proxy architecture, customisation, runbook
-- [CHANGELOG.md](CHANGELOG.md) — release history
-- [CONTRIBUTING.md](CONTRIBUTING.md) — development workflow, code style, PR process
-- [ROADMAP.md](ROADMAP.md) — what's planned and what's out of scope
-- [SECURITY.md](SECURITY.md) — vulnerability disclosure policy
+### Getting started
+
+- **[docs/installation.md](docs/installation.md)** — step-by-step install for laptop and VPS
+- **[docs/architecture.md](docs/architecture.md)** — design rationale and request flow
+- **[docs/troubleshooting.md](docs/troubleshooting.md)** — failure modes and fixes
+
+### Operations
+
+- **[docs/backup-and-restore.md](docs/backup-and-restore.md)** — backup procedure, drill cadence, off-host shipping
+- **[docs/production-deployment.md](docs/production-deployment.md)** — server prep, SSL, monitoring, scaling, security
+- **[docs/pgbouncer.md](docs/pgbouncer.md)** — why connection pooling matters; sizing; LISTEN/NOTIFY trade-offs
+- **[nginx/README.md](nginx/README.md)** — reverse-proxy architecture and customisation
+
+### Project
+
+- **[CHANGELOG.md](CHANGELOG.md)** — release history
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — workflow, code style, PR process
+- **[ROADMAP.md](ROADMAP.md)** — what's planned and what's out of scope
+- **[SECURITY.md](SECURITY.md)** — vulnerability disclosure policy
+
+---
 
 ## License
 

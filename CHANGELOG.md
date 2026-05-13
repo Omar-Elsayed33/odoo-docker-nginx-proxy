@@ -70,9 +70,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `.env.prod.example` — production env template with `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml` so plain `docker compose` and every `scripts/` wrapper transparently apply the prod overrides. Production-oriented defaults: separate `POSTGRES_VOLUME` (`odoo-prod-pgdata`), real domain placeholder, `WORKERS=9`, resource caps per service.
 - `docs/production-deployment.md` — server requirements table, pre-deployment checklist (server prep / repo / TLS / verify), step-by-step deploy, environment-separation table (dev ↔ prod), SSL strategy (Let's Encrypt webroot + commercial CA), backup strategy with 3-2-1 rule and restic example, monitoring tiers (MVP → Prometheus/Grafana → log shipping), scaling sequence (vertical → horizontal Odoo → horizontal Postgres last), security recommendations, operational runbook table, common production issues table, cut-over checklist.
 
-### Changed
+### Changed (production deployment surface)
 - README repo layout adds `docker-compose.prod.yml`, `.env.prod.example`, `docs/production-deployment.md`.
 - README Documentation section now lists per-component docs (production, pgbouncer, nginx).
+
+### Documentation pass (v1.0 readiness)
+- README rewritten as a tight entry point: Contents TOC, "Why this stack" framing, Features table, Architecture diagram, 3-command Quick start, repo layout, Operational scripts table, Documentation link tree. Heavy content moved into per-concern docs.
+- `docs/architecture.md` — new. Design rationale split into Components / Request flow / Data flow / Network topology / Configuration model / Lifecycle / Design decisions worth flagging / What's deliberately out of scope.
+- `docs/installation.md` — new. Prerequisites table (Linux/macOS/Windows), 3-command install, what `install.sh` actually does, verifying the install, common installation issues, updating, uninstalling cleanly.
+- `docs/backup-and-restore.md` — new. What's in a backup, taking a backup, restoring (in-place / renamed / non-interactive), scheduling (cron + systemd timer), off-host shipping (restic / rclone / borg comparison + restic example), restore drills with cadence, verification, encryption options, troubleshooting table.
+- `docs/troubleshooting.md` — new. Symptom-organised catalogue of every failure mode this stack has actually hit: stack won't come up, auth failures, healthcheck failures, performance issues, backup/restore, TLS/proxy, env/config, cross-platform Windows, plus diagnostic recipes.
+- `docs/production-deployment.md` — tightened: added Contents TOC, references `architecture.md` for the "why" and `backup-and-restore.md` instead of duplicating the backup section.
+- `CONTRIBUTING.md` rewritten with: Contents TOC, first-time-contributor walkthrough, expanded development workflow, Conventional Commits type table with examples, code-style sub-sections per language (shell / YAML / nginx / markdown), expanded PR checklist.
 
 ### Planned
 - Rate-limit enforcement on `/web/login` and `/web/database/*` (v0.4).

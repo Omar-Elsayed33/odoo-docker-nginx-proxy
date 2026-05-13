@@ -2,8 +2,23 @@
 
 This is the operational reference for taking this stack live on a Linux
 server. It assumes you've already worked with the stack locally and read
-the top-level [README](../README.md), [SECURITY.md](../SECURITY.md), and
-[pgbouncer.md](./pgbouncer.md).
+the top-level [README](../README.md), [architecture.md](architecture.md),
+and [SECURITY.md](../SECURITY.md).
+
+## Contents
+
+- [Server requirements](#1-server-requirements)
+- [Pre-deployment checklist](#2-pre-deployment-checklist)
+- [Deployment](#3-deployment)
+- [Environment separation](#4-environment-separation)
+- [SSL strategy](#5-ssl-strategy)
+- [Backup strategy](#6-backup-strategy)
+- [Monitoring](#7-monitoring)
+- [Scaling](#8-scaling)
+- [Security recommendations](#9-security-recommendations)
+- [Operational runbook](#10-operational-runbook)
+- [Common production issues](#11-common-production-issues)
+- [Before you cut over](#12-before-you-cut-over)
 
 ```
                               Internet
@@ -196,38 +211,16 @@ verification commands and the safe rotation procedure.
 
 ## 6. Backup strategy
 
-### Local backups (already wired)
+See [backup-and-restore.md](backup-and-restore.md) for the full
+procedure, scheduling examples, and off-host shipping comparison. The
+short version for production:
 
 ```bash
-# Manual
-./scripts/backup.sh --keep 14
-
-# Cron — nightly at 02:30, keep 14 days
+# Cron — nightly at 02:30, keep 14 days locally
 30 2 * * * cd /opt/odoo && ./scripts/backup.sh --keep 14 \
             >> /var/log/odoo-backup.log 2>&1
-```
 
-The archives land in `./backups/`, are sha256-verifiable via their
-embedded manifest, and atomic (interrupted runs leave nothing partial).
-
-### Off-host shipping (the part that matters)
-
-> A backup on the same host as the database is not a backup — it's a
-> hedge against fat-fingering, nothing more.
-
-Pick one of the following based on what you already operate:
-
-| Tool | Best for | Encryption | Dedup |
-|---|---|---|---|
-| `restic` | Personal / small ops, S3-compatible target | Yes (AES-256) | Yes |
-| `rclone` | Already using cloud storage | Optional | No |
-| `aws s3 sync` | AWS-only shop | SSE | No |
-| `borg` | Self-hosted destination over SSH | Yes | Yes |
-
-Minimal `restic` example, shipped to Backblaze B2 nightly at 03:00:
-
-```bash
-# /etc/cron.d/odoo-ship-backups
+# Cron — ship to off-host storage at 03:00
 0 3 * * * deploy cd /opt/odoo && \
   RESTIC_REPOSITORY=b2:my-bucket:odoo \
   RESTIC_PASSWORD_FILE=/etc/odoo/restic.pass \
@@ -235,24 +228,18 @@ Minimal `restic` example, shipped to Backblaze B2 nightly at 03:00:
   restic forget --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune
 ```
 
-### Restore drills
-
-The only backup that works is one you've restored. Schedule a drill:
-
-- **Monthly** for the first quarter after going live.
-- **Quarterly** thereafter.
-
-```bash
-# On a staging box (NOT prod):
-./scripts/restore.sh /path/to/some-prod-backup.tar.gz --target drill_test
-# Log in to staging Odoo, smoke-test critical screens, then drop.
-```
-
-### 3-2-1, simplified
+The 3-2-1 rule, simplified:
 
 - **3** copies of every backup (prod local + prod remote + audited archive)
 - **2** different storage media (disk + object storage)
 - **1** off-site (different region from prod)
+
+### Restore drills
+
+The only backup that works is one you've restored. Cadence: **monthly**
+for the first quarter after going live, **quarterly** thereafter. See
+[backup-and-restore.md → Restore drills](backup-and-restore.md#restore-drills)
+for the procedure.
 
 ---
 
@@ -343,10 +330,7 @@ upstream odoo_http {
     server odoo-2:8069;
     server odoo-3:8069;
     keepalive 32;
-    # Odoo sessions are sticky-by-default — affinity prevents the
-    # surprises (logged-out feel) from a request landing on a worker
-    # without the session cache primed.
-    hash $remote_addr consistent;
+    hash $remote_addr consistent;   # session affinity
 }
 ```
 
@@ -449,13 +433,16 @@ up for anything regulated.
 
 ## 11. Common production issues
 
+See [troubleshooting.md](troubleshooting.md) for the full failure-mode
+catalogue. The production-specific entries:
+
 | Symptom | First check | Likely cause |
 |---|---|---|
 | Workers OOM-killed | `dmesg \| tail`, `docker stats` | `limit_memory_hard` in `odoo.conf` exceeds container memory — lower one or raise the other |
 | Login spam from bots | nginx `access.log` | Turn on the rate-limit zones in `nginx/conf.d/odoo.conf` (already declared; just add `limit_req` directives in the `/web/login` location) |
 | `cl_waiting` consistently > 0 in `SHOW POOLS` | PgBouncer stats | Pool too small — raise `default_pool_size` in `pgbouncer.ini` |
 | Postgres slow after weeks of uptime | `\dt+`, `pg_stat_user_tables` | Bloat — schedule `VACUUM ANALYZE` weekly via cron |
-| Bus / chat sluggish | longpolling worker logs | Either nginx isn't forwarding websocket Upgrade (verify in browser devtools), or PgBouncer is in transaction mode and you need the bypass for the longpolling worker — see [docs/pgbouncer.md](./pgbouncer.md) |
+| Bus / chat sluggish | longpolling worker logs | Either nginx isn't forwarding websocket Upgrade (verify in browser devtools), or PgBouncer is in transaction mode and you need the bypass for the longpolling worker — see [pgbouncer.md](pgbouncer.md) |
 | Disk full | `df -h`, `docker system df` | Backups not pruning, log retention too generous, old images not GC'd — `docker system prune --volumes` carefully |
 
 ---
