@@ -1,0 +1,2 @@
+# Keeps the bind-mount target in git. Real cert files (*.pem, *.key)
+# in this directory are ignored by .gitignore. See README.md.

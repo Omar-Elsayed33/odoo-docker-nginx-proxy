@@ -20,16 +20,19 @@ Goal: a runnable Odoo + PostgreSQL Compose stack that boots cleanly from `.env.e
 - [x] Private bridge network; database not exposed to the host
 - [x] `postgres/init/` for first-boot SQL/sh scripts (with an example)
 
-## v0.2 — Nginx reverse proxy (upcoming)
+## v0.2 — Nginx reverse proxy ✅ completed
 
 Goal: a public, TLS-terminated entry point in front of Odoo.
 
-- [ ] `config/nginx/nginx.conf` and a per-vhost `odoo.conf`
-- [ ] TLS termination with strong cipher defaults
-- [ ] Websocket upgrade for Odoo longpolling (`gevent_port`)
-- [ ] Sane proxy timeouts, gzip, and `client_max_body_size` for uploads
-- [ ] Flip `proxy_mode = True` in `odoo.conf` once trusted-proxy is in place
-- [ ] Self-signed cert bootstrap for local development
+- [x] `nginx/conf.d/odoo.conf` vhost with HTTP→HTTPS redirect + ACME path
+- [x] TLS 1.2 / 1.3 with Mozilla intermediate cipher set + session cache
+- [x] Websocket upgrade for `/websocket` and legacy `/longpolling/`
+- [x] Reusable snippets in `nginx/templates/` (TLS, security headers, gzip, proxy)
+- [x] `client_max_body_size`, gzip, and `X-Forwarded-*` headers
+- [x] Static-asset caching on `/web/{static,content,image}/`
+- [x] Flipped `proxy_mode = True` in `odoo.conf`
+- [x] Self-signed cert bootstrap documented in `nginx/certs/README.md`
+- [x] Rate-limit zones declared (enforcement deferred to v0.4)
 
 ## v0.3 — PgBouncer integration (upcoming)
 

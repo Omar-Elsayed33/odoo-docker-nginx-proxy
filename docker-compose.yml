@@ -2,12 +2,12 @@
 # odoo-docker-nginx-proxy — base standalone stack
 #
 # Services in this file:
-#   - db   : PostgreSQL (the only database supported by Odoo)
-#   - odoo : Odoo application server
+#   - db    : PostgreSQL (the only database supported by Odoo)
+#   - odoo  : Odoo application server
+#   - nginx : Reverse proxy / TLS termination / public entry point
 #
 # Not in this file (yet, by design):
-#   - Nginx reverse proxy   — added in a follow-up PR
-#   - PgBouncer connection  — added in a follow-up PR
+#   - PgBouncer connection pooling — added in a follow-up PR (v0.3)
 #
 # Bring it up with:
 #   cp .env.example .env && $EDITOR .env
@@ -75,11 +75,11 @@ services:
   # ODOO_VERSION as a fallback. See .env.example for the version
   # strategy — switching majors is a database migration, not a tweak.
   #
-  # The ports below bind to 127.0.0.1 only. This stack is "standalone"
-  # but not "internet-facing" — Nginx (next PR) will be the public
-  # entry point. On a remote host, reach Odoo via SSH tunnel until
-  # then:
-  #   ssh -L 8069:127.0.0.1:8069 user@host
+  # No `ports:` block: Odoo is reachable only via the private
+  # `odoo-net` bridge. Nginx is the public entry point. For local
+  # debugging without going through nginx, either:
+  #   - docker compose exec odoo curl http://localhost:8069/web/health
+  #   - temporarily add ports: ["127.0.0.1:8069:8069"] in an override
   odoo:
     image: ${ODOO_IMAGE:-odoo:${ODOO_VERSION:-18.0}}
     container_name: ${COMPOSE_PROJECT_NAME:-odoo}-app
@@ -106,9 +106,9 @@ services:
       # Custom addons path. Drop your modules into ./odoo/addons/ and
       # they appear inside the container at /mnt/extra-addons.
       - ./odoo/addons:/mnt/extra-addons
-    ports:
-      - "127.0.0.1:8069:8069"   # HTTP / XML-RPC
-      - "127.0.0.1:8072:8072"   # Longpolling / gevent (chat, bus)
+    expose:
+      - "8069"   # HTTP / XML-RPC      (reached by nginx upstream)
+      - "8072"   # Longpolling / gevent (reached by nginx upstream)
     networks:
       - odoo-net
     healthcheck:
@@ -121,6 +121,46 @@ services:
       start_period: 60s
     logging: *default-logging
 
+  # ───────────────────────────────────────────────────────────────────
+  # Nginx — reverse proxy & TLS termination
+  # ───────────────────────────────────────────────────────────────────
+  # The only service in this stack with published host ports. See
+  # nginx/README.md for the architecture and nginx/certs/README.md
+  # for cert provisioning (nginx will fail to start without them).
+  #
+  # Mounts:
+  #   conf.d/   → /etc/nginx/conf.d/    (vhost)
+  #   templates/→ /etc/nginx/templates/ (reusable snippets)
+  #   certs/    → /etc/nginx/certs/     (TLS material, gitignored)
+  nginx:
+    image: nginx:${NGINX_VERSION:-1.27}-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-odoo}-nginx
+    restart: unless-stopped
+    depends_on:
+      odoo:
+        condition: service_healthy
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      # Webroot for ACME HTTP-01 challenges (used by the certbot
+      # sidecar that lands in v0.5).
+      - certbot-webroot:/var/www/certbot
+    environment:
+      TZ: ${TZ:-UTC}
+    networks:
+      - odoo-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/nginx-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging: *default-logging
+
 # ─── Volumes ─────────────────────────────────────────────────────────
 # Named so they survive `docker compose down` (use `down -v` to wipe).
 # The name fields make the volumes greppable in `docker volume ls` and
@@ -130,6 +170,10 @@ volumes:
     name: ${POSTGRES_VOLUME:-odoo-pgdata}
   odoo-data:
     name: ${COMPOSE_PROJECT_NAME:-odoo}-filestore
+  # Empty until the ACME sidecar lands in v0.5. Declaring it now
+  # means we don't need a compose-file change to add the sidecar.
+  certbot-webroot:
+    name: ${COMPOSE_PROJECT_NAME:-odoo}-certbot-webroot
 
 # ─── Networks ────────────────────────────────────────────────────────
 # Single private bridge. Nothing on this network is reachable from

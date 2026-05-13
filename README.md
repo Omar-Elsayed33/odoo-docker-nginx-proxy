@@ -101,7 +101,12 @@ docker compose logs -f odoo
 │   └── init/                   # First-boot SQL/sh scripts for the cluster
 │       ├── README.md
 │       └── 10-extensions.sql.example
-├── config/                     # (future) Nginx vhost, certs
+├── nginx/
+│   ├── README.md               # Reverse-proxy architecture, ops, customisation
+│   ├── conf.d/
+│   │   └── odoo.conf           # Vhost: upstreams, TLS, websocket, static cache
+│   ├── templates/              # Reusable snippets (TLS, security, gzip, proxy)
+│   └── certs/                  # TLS material (gitignored except README.md)
 ├── pgbouncer/                  # (future) Pool config + userlist
 ├── scripts/                    # (future) backup.sh, restore.sh
 └── docs/                       # (future) ADRs, runbooks
